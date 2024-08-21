@@ -14,7 +14,8 @@ import {
   Variant,
   Vec,
 } from "azle";
-//establish sneakers shop
+
+// Define Records
 const Comment = Record({
   id: Principal,
   by: text,
@@ -22,6 +23,7 @@ const Comment = Record({
   product: text,
   commented_at: nat64,
 });
+
 const Product = Record({
   nameofproduct: text,
   owner: text,
@@ -31,6 +33,7 @@ const Product = Record({
   likes: Vec(Principal),
   created_at: nat64,
 });
+
 const User = Record({
   username: text,
   id: Principal,
@@ -47,31 +50,21 @@ const EnquireAboutAProduct = Record({
   enquire: text,
   created_at: nat64,
 });
+
 const Question = Record({
   question: text,
   id: Principal,
   useremail: text,
   created_at: nat64,
 });
-const retriveCommenstPayload = Record({
-  productname: text,
-});
-const likePayload=Record({
-  nameofproduct:text,
-});
-//types
-type Product = typeof Product.tsType;
-type User = typeof User.tsType;
-type EnquireAboutAProduct = typeof EnquireAboutAProduct.tsType;
-type Comment = typeof Comment.tsType;
-type Question = typeof Question.tsType;
 
-//payloads
+// Define Payloads
 const userPayload = Record({
   username: text,
   email: text,
   usercontacts: text,
 });
+
 const productPayload = Record({
   nameofproduct: text,
   description: text,
@@ -83,74 +76,77 @@ const enquirePayload = Record({
   useremail: text,
   enquire: text,
 });
-const getid = Record({
-  username: text,
-});
-const searchProduct = Record({
-  productname: text,
-});
-const commentPaylod = Record({
+
+const commentPayload = Record({
   by: text,
   comment: text,
   productname: text,
 });
+
 const questionPayload = Record({
   question: text,
   useremail: text,
 });
-const getUserPayload=Record({
-  username:text,
-}
-)
-//errors
+
+const likePayload = Record({
+  nameofproduct: text,
+});
+
+const getUserPayload = Record({
+  username: text,
+});
+
+const searchProduct = Record({
+  productname: text,
+});
+
+const getid = Record({
+  username: text,
+});
+
+// Define Errors
 const Errors = Variant({
   notFound: text,
-  MissingCredentails: text,
-  FaildToBook: text,
+  MissingCredentials: text,
+  FailedToBook: text,
   AlreadyRegistered: text,
   NotRegistered: text,
   ProductNotAvailable: text,
-  UserNotFound:text,
+  UserNotFound: text,
 });
 
-//storages
-const usersStorages = StableBTreeMap<text, User>(0);
-const productsStorages = StableBTreeMap<text, Product>(1);
-const enquiries = StableBTreeMap<Principal, EnquireAboutAProduct>(2);
-const questionstorages = StableBTreeMap<Principal, Question>(3);
+// Storage Maps
+const usersStorage = StableBTreeMap<text, typeof User>(0);
+const productsStorage = StableBTreeMap<text, typeof Product>(1);
+const enquiries = StableBTreeMap<Principal, typeof EnquireAboutAProduct>(2);
+const questionStorage = StableBTreeMap<Principal,typeof Question>(3);
 
+// Canister Functions
 export default Canister({
-  getuser: query([getUserPayload] , Result(User,Errors), (payload) => {
-    const getuser=usersStorages.get(payload.username).Some;
-    if(!getuser){
+  getuser: query([getUserPayload], Result(User, Errors), (payload: any) => {
+    const user = usersStorage.get(payload.username);
+    if (user === undefined) {
       return Err({
-        UserNotFound:`user with ${payload.username} not found`
-      })
+        UserNotFound: `User with username ${payload.username} not found.`,
+      });
     }
-    return Ok(getuser);
-   
+    return Ok(user);
   }),
-  registeruser: update([userPayload], Result(text, Errors), (payload) => {
-    //check that all credentials are available
+
+  registeruser: update([userPayload], Result(text, Errors), (payload: any) => {
     if (!payload.email || !payload.usercontacts || !payload.username) {
       return Err({
-        MissingCredentails: "some credentials are missing",
+        MissingCredentials: "Some credentials are missing.",
       });
     }
-    //verify that email is of correct format
-    // if(!payload.email.con("@")){
-    //     return Err()
-    // }
-    //check if username is already taken
-    const username_exists = usersStorages.get(payload.username).Some;
-    if (username_exists) {
+
+    if (usersStorage.get(payload.username)) {
       return Err({
-        AlreadyRegistered:
-          "username provided is already registered try another one",
+        AlreadyRegistered: "Username is already registered, try another one.",
       });
     }
-    //register user
-    const new_user: User = {
+
+    const newUser: typeof User = {
       username: payload.username,
       id: ic.caller(),
       email: payload.email,
@@ -158,31 +154,29 @@ export default Canister({
       usercontacts: payload.usercontacts,
       created_at: ic.time(),
     };
-    usersStorages.insert(payload.username, new_user);
-    return Ok("you have successfully registered for this year exhibition show");
+
+    usersStorage.insert(payload.username, newUser);
+    return Ok("You have successfully registered for this year's exhibition show.");
   }),
 
-  //register products for showcase
   registerproducts_for_exhibition: update(
     [productPayload],
     Result(text, Errors),
-    (payload) => {
-      //verify that all fields are present
+    (payload:any) => {
       if (!payload.description || !payload.nameofproduct || !payload.owner) {
         return Err({
-          MissingCredentails: "some credentials are missing",
+          MissingCredentials: "Some credentials are missing.",
         });
       }
-      //check if user is already registered
-      const owner_exists = usersStorages.get(payload.owner).Some;
-      if (!owner_exists) {
+
+      const owner = usersStorage.get(payload.owner);
+      if (!owner) {
         return Err({
-          NotRegistered:
-            "only registered users are allowed to showcase their products for exhibition",
+          NotRegistered: "Only registered users can showcase their products.",
         });
       }
-      //register product for exhibition
-      const new_product: Product = {
+
+      const newProduct:typeof Product = {
         nameofproduct: payload.nameofproduct,
         owner: payload.owner,
         id: generateId(),
@@ -191,195 +185,188 @@ export default Canister({
         likes: [],
         created_at: ic.time(),
       };
-      //upadte products and users storages
-      productsStorages.insert(payload.nameofproduct, new_product);
-      //update on users side
-      const upadated_user: User = {
-        ...owner_exists,
-        productsforexhibition: [...owner_exists.productsforexhibition,new_product],
-      };
-      usersStorages.insert(payload.owner, upadated_user);
-      return Ok("you have added product for exhibition successfully");
+
+      productsStorage.insert(payload.nameofproduct, newProduct);
+      owner.productsforexhibition.push(newProduct);
+      usersStorage.insert(payload.owner, owner);
+
+      return Ok("Product added for exhibition successfully.");
     }
   ),
-  //function to get all products that will be available for exhibitions
+
   getallproducts_for_exhibition: query([], Vec(Product), () => {
-    return productsStorages.values();
+    return productsStorage.values();
   }),
 
-  //search for a product to know if it will be available for exhibitions
-  searchproduct: query([searchProduct], Result(Product, Errors), (payload) => {
-    //verify that the field for search is not empty
+  searchproduct: query([searchProduct], Result(Product, Errors), (payload: any) => {
     if (!payload.productname) {
       return Err({
-        MissingCredentails: "product name field is empty",
+        MissingCredentials: "Product name field is empty.",
       });
     }
-    const get_product = productsStorages.get(payload.productname).Some;
-    if (!get_product) {
+
+    const product = productsStorage.get(payload.productname);
+    if (!product) {
       return Err({
-        ProductNotAvailable: `product with ${payload.productname} is not available`,
+        ProductNotAvailable: `Product with name ${payload.productname} is not available.`,
       });
     }
-    return Ok(get_product);
+
+    return Ok(product);
   }),
-  //comment on a product
-  comment_on_product: update(
-    [commentPaylod],
-    Result(text, Errors),
-    (payload) => {
-      //verify that every field is not empty
-      if (!payload.by || !payload.comment || !payload.productname) {
-        return Err({
-          MissingCredentails: "some credentials are missing",
-        });
-      }
-      //verify that is comment is already registered
-      const user_registered = usersStorages.get(payload.by).Some;
-      if (!user_registered) {
-        return Err({
-          NotRegistered:
-            "you must be registered inorder to comment on a product",
-        });
-      }
-      //verify that the product actually exists
-      const get_product = productsStorages.get(payload.productname).Some;
-      if (!get_product) {
-        return Err({
-          ProductNotAvailable: `product by name ${payload.productname} is not available`,
-        });
-      }
-      //add new comment
-      const new_comment: Comment = {
-        id: generateId(),
-        by: payload.by,
-        comment: payload.comment,
-        product: payload.productname,
-        commented_at: ic.time(),
-      };
-      //update user storages and product storages
-      const upadted_products: Product = {
-        ...get_product,
-        comments: [...get_product.comments, new_comment],
-      };
-      //update on users side
-      const get_owner = usersStorages.get(get_product.owner).Some;
-      if (!get_owner) {
-        return Err({
-          notFound: "failed to comment on product",
-        });
-      }
-      productsStorages.insert(get_product.owner, upadted_products);
 
-      const upadated_user: User = {
-        ...get_owner,
-        productsforexhibition: [...get_owner.productsforexhibition,upadted_products],
-      };
-      usersStorages.insert(get_product.owner,upadated_user);
-      return Ok("comment sent successfully");
-    }
-  ),
-  
-
-  //function to add like to a product
-  likeaproduct:update([likePayload],Result(text,Errors),(payload)=>{
-    //verify that payload is not empty
-    if(!payload.nameofproduct){
-      return(
-        Err({
-          MissingCredentails: "name o product is missing",
-        })
-      )
-    }
-
-    //verify if product exists
-    const get_product = productsStorages.get(payload.nameofproduct).Some;
-    if (!get_product) {
+  comment_on_product: update([commentPayload], Result(text, Errors), (payload: any) => {
+    if (!payload.by || !payload.comment || !payload.productname) {
       return Err({
-        ProductNotAvailable: `product by name ${payload.nameofproduct} is not available`,
+        MissingCredentials: "Some credentials are missing.",
       });
     }
-    //add like
-    const upadted_products: Product = {
-      ...get_product,
-      likes: [...get_product.likes, ic.caller()],
-    };
-    //update on users side
-    const get_owner = usersStorages.get(get_product.owner).Some;
-    if (!get_owner) {
+
+    const user = usersStorage.get(payload.by);
+    if (!user) {
       return Err({
-        notFound: "failed to like a product",
+        NotRegistered: "You must be registered to comment on a product.",
       });
     }
-    productsStorages.insert(get_product.owner, upadted_products);
 
-    const upadated_user: User = {
-      ...get_owner,
-      productsforexhibition: [
-        ...get_owner.productsforexhibition,
-        upadted_products,
-      ],
+    const product = productsStorage.get(payload.productname);
+    if (!product) {
+      return Err({
+        ProductNotAvailable: `Product with name ${payload.productname} is not available.`,
+      });
+    }
+
+    const newComment: typeof Comment = {
+      id: generateId(),
+      by: payload.by,
+      comment: payload.comment,
+      product: payload.productname,
+      commented_at: ic.time(),
     };
-    usersStorages.insert(get_product.owner,upadated_user);
-    return Ok("like added")
+
+    product.comments.push(newComment);
+    productsStorage.insert(payload.productname, product);
+
+    return Ok("Comment sent successfully.");
   }),
-  //ask a question concerning exhibitions
-  ask_question: update([questionPayload], Result(text, Errors), (payload) => {
-    //verify that all fields are available
+
+  likeaproduct: update([likePayload], Result(text, Errors), (payload: any) => {
+    if (!payload.nameofproduct) {
+      return Err({
+        MissingCredentials: "Product name is missing.",
+      });
+    }
+
+    const product = productsStorage.get(payload.nameofproduct);
+    if (!product) {
+      return Err({
+        ProductNotAvailable: `Product with name ${payload.nameofproduct} is not available.`,
+      });
+    }
+
+    product.likes.push(ic.caller());
+    productsStorage.insert(payload.nameofproduct, product);
+
+    return Ok("Like added successfully.");
+  }),
+
+  ask_question: update([questionPayload], Result(text, Errors), (payload: any) => {
     if (!payload.question || !payload.useremail) {
       return Err({
-        MissingCredentails: "some credentials are missing",
+        MissingCredentials: "Some credentials are missing.",
       });
     }
-    //ask question
-    const new_question: Question = {
+
+    const newQuestion: typeof Question = {
       question: payload.question,
       id: generateId(),
       useremail: payload.useremail,
       created_at: ic.time(),
     };
-    questionstorages.insert(generateId(), new_question);
-    return Ok(
-      "your concern have been received we will provide a feedback as soon as possible"
-    );
-  }),
-  //enquire about a product
-  enquire_about_a_product: update(
-    [enquirePayload],
-    Result(text, Errors),
-    (payload) => {
-      //verify that all fields are available
-      if (!payload.enquire || !payload.productname || !payload.useremail) {
-        return Err({
-          MissingCredentails: "some credentials are missing",
-        });
-      }
-      //ensure that the prodcut user want to enquire is availble
-      const get_product = productsStorages.get(payload.productname).Some;
-      if (!get_product) {
-        return Err({
-          ProductNotAvailable: `product ${payload.productname} is not available`,
-        });
-      }
-      //new enquire
-      const new_enquire: EnquireAboutAProduct = {
-        productname: payload.productname,
-        id: generateId(),
-        useremail: payload.useremail,
-        enquire: payload.enquire,
-        created_at: ic.time(),
-      };
 
-      enquiries.insert(generateId(), new_enquire);
-      return Ok("enquire have been submitted");
+    questionStorage.insert(generateId(), newQuestion);
+
+    return Ok("Your question has been received. We will provide feedback as soon as possible.");
+  }),
+
+  enquire_about_a_product: update([enquirePayload], Result(text, Errors), (payload: any) => {
+    if (!payload.enquire || !payload.productname || !payload.useremail) {
+      return Err({
+        MissingCredentials: "Some credentials are missing.",
+      });
     }
-  ),
+
+    const product = productsStorage.get(payload.productname);
+    if (!product) {
+      return Err({
+        ProductNotAvailable: `Product with name ${payload.productname} is not available.`,
+      });
+    }
+
+    const newEnquire: typeof EnquireAboutAProduct = {
+      productname: payload.productname,
+      id: generateId(),
+      useremail: payload.useremail,
+      enquire: payload.enquire,
+      created_at: ic.time(),
+    };
+
+    enquiries.insert(generateId(), newEnquire);
+
+    return Ok("Enquiry submitted successfully.");
+  }),
+
+  // New Function: Update User Profile
+  update_user_profile: update([userPayload], Result(text, Errors), (payload: any) => {
+    const user = usersStorage.get(payload.username);
+    if (!user) {
+      return Err({
+        UserNotFound: `User with username ${payload.username} not found.`,
+      });
+    }
+
+    const updatedUser: typeof User = {
+      ...user,
+      email: payload.email,
+      usercontacts: payload.usercontacts,
+    };
+
+    usersStorage.insert(payload.username, updatedUser);
+
+    return Ok("User profile updated successfully.");
+  }),
+
+  // New Function: Delete Product
+  delete_product: update([searchProduct], Result(text, Errors), (payload: any) => {
+    const product = productsStorage.get(payload.productname);
+    if (!product) {
+      return Err({
+        ProductNotAvailable: `Product with name ${payload.productname} is not available.`,
+      });
+    }
+
+    const owner = usersStorage.get(product.owner);
+    if (!owner) {
+      return Err({
+        UserNotFound: "Owner not found.",
+      });
+    }
+
+    owner.productsforexhibition = owner.productsforexhibition.filter(
+      (p: any) => p.nameofproduct !== payload.productname
+    );
+
+    usersStorage.insert(product.owner, owner);
+    productsStorage.remove(payload.productname);
+
+    return Ok("Product deleted successfully.");
+  }),
 });
 
-//helpers function to generate principals ids
+// Helper function to generate Principal IDs
 function generateId(): Principal {
   const randomBytes = new Array(29)
     .fill(0)
-    .map((_) => Math.floor(Math.random() * 256));
+    .map(() => Math.floor(Math.random() * 256));
   return Principal.fromUint8Array(Uint8Array.from(randomBytes));
 }
